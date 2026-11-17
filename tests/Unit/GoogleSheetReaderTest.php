@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Exceptions\SheetReadException;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\Google\GoogleSheetReader;
 use Google\Client;
@@ -11,15 +12,12 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 
-it('asks Google for date cells as serial numbers so the sheet locale cannot swap day and month', function (): void {
-    $history = [];
-    $stack = HandlerStack::create(new MockHandler([
-        new Response(200, ['Content-Type' => 'application/json'], json_encode([
-            'range' => "'Sales'!A1:B2",
-            'majorDimension' => 'ROWS',
-            'values' => [['date', 'amount'], [46085, 3]],
-        ])),
-    ]));
+/**
+ * A reader whose HTTP calls get $response; the requests sent are appended to $history.
+ */
+function readerReturning(Response $response, array &$history = []): GoogleSheetReader
+{
+    $stack = HandlerStack::create(new MockHandler([$response]));
     $stack->push(Middleware::history($history));
 
     $client = new Client();
@@ -29,7 +27,25 @@ it('asks Google for date cells as serial numbers so the sheet locale cannot swap
     $factory = Mockery::mock(GoogleClientFactory::class);
     $factory->shouldReceive('make')->andReturn($client);
 
-    $rows = (new GoogleSheetReader($factory))->rows('sheet-id', 'Sales');
+    return new GoogleSheetReader($factory);
+}
+
+function googleError(int $code, string $message): Response
+{
+    return new Response($code, ['Content-Type' => 'application/json'], json_encode([
+        'error' => ['code' => $code, 'message' => $message, 'errors' => [['message' => $message, 'domain' => 'global', 'reason' => 'x']]],
+    ]));
+}
+
+it('asks Google for date cells as serial numbers so the sheet locale cannot swap day and month', function (): void {
+    $history = [];
+    $reader = readerReturning(new Response(200, ['Content-Type' => 'application/json'], json_encode([
+        'range' => "'Sales'!A1:B2",
+        'majorDimension' => 'ROWS',
+        'values' => [['date', 'amount'], [46085, 3]],
+    ])), $history);
+
+    $rows = $reader->rows('sheet-id', 'Sales');
 
     parse_str($history[0]['request']->getUri()->getQuery(), $query);
 
@@ -37,3 +53,12 @@ it('asks Google for date cells as serial numbers so the sheet locale cannot swap
         ->and($query['dateTimeRenderOption'])->toBe('SERIAL_NUMBER')
         ->and($query['valueRenderOption'])->toBe('UNFORMATTED_VALUE');
 });
+
+it('turns Google errors into one readable message with a hint', function (int $code, string $reason, string $expected): void {
+    expect(fn () => readerReturning(googleError($code, $reason))->rows('sheet-id', 'Salez'))
+        ->toThrow(SheetReadException::class, $expected);
+})->with([
+    'unknown tab' => [400, "Unable to parse range: 'Salez'", "Google Sheets API error (400) for sheet-id / Salez: Unable to parse range: 'Salez'. Check that the tab name matches the sheet exactly."],
+    'not shared' => [403, 'The caller does not have permission', 'Google Sheets API error (403) for sheet-id / Salez: The caller does not have permission. Share the spreadsheet with the service account e-mail (Viewer).'],
+    'wrong id, no double full stop' => [404, 'Requested entity was not found.', 'Google Sheets API error (404) for sheet-id / Salez: Requested entity was not found. Check the spreadsheet id.'],
+]);

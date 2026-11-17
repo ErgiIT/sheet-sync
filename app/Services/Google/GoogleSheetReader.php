@@ -57,12 +57,14 @@ class GoogleSheetReader implements SheetReader
 
     private function wrap(GoogleServiceException $e, string $spreadsheetId, ?string $tab = null): SheetReadException
     {
-        $reason = $e->getErrors()[0]['message'] ?? $e->getMessage();
+        // Google's messages usually end with a full stop already; one is added below.
+        $reason = rtrim((string) ($e->getErrors()[0]['message'] ?? $e->getMessage()), '. ');
         $target = null === $tab ? $spreadsheetId : "{$spreadsheetId} / {$tab}";
 
-        $hint = match ($e->getCode()) {
-            403 => ' Share the spreadsheet with the service account e-mail (Viewer).',
-            404 => ' Check the spreadsheet id.',
+        $hint = match (true) {
+            403 === $e->getCode() => ' Share the spreadsheet with the service account e-mail (Viewer).',
+            404 === $e->getCode() => ' Check the spreadsheet id.',
+            400 === $e->getCode() && null !== $tab => ' Check that the tab name matches the sheet exactly.',
             default => '',
         };
 
