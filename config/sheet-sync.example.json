@@ -1,0 +1,59 @@
+{
+    "spreadsheets": [
+        {
+            "name": "Sales - EU store",
+            "spreadsheet_id": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit",
+            "is_active": true,
+            "tabs": [
+                {
+                    "name": "Sales",
+                    "header_row": 1,
+                    "mappings": [
+                        {
+                            "target_table": "sales",
+                            "sync_mode": "replace",
+                            "columns": [
+                                { "source_column": "date", "target_column": "date", "type": "date" },
+                                { "source_column": "product_name", "target_column": "name", "type": "string" },
+                                { "source_column": "price", "target_column": "product_price", "type": "decimal" },
+                                { "source_column": "amount", "target_column": "amount", "type": "integer" }
+                            ]
+                        },
+                        {
+                            "target_table": "products",
+                            "sync_mode": "upsert",
+                            "key_columns": ["name"],
+                            "columns": [
+                                { "source_column": "product_name", "target_column": "name", "type": "string" },
+                                { "source_column": "price", "target_column": "last_price", "type": "decimal" }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Sales - US store",
+            "spreadsheet_id": "1abcDEFghiJKLmnoPQRstuVWXyz0123456789ABCDEF",
+            "tabs": [
+                {
+                    "name": "Orders 2026",
+                    "header_row": 2,
+                    "mappings": [
+                        {
+                            "target_table": "sales",
+                            "sync_mode": "replace",
+                            "columns": [
+                                { "source_column": "Order Date", "target_column": "date", "type": "date" },
+                                { "source_column": "Product", "target_column": "name", "type": "string" },
+                                { "source_column": "Unit Price", "target_column": "product_price", "type": "decimal" },
+                                { "source_column": "Qty", "target_column": "amount", "type": "integer" },
+                                { "source_column": "Country", "target_column": "country", "type": "string" }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
