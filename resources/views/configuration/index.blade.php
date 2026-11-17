@@ -19,6 +19,7 @@
                 <input id="file" name="file" type="file" accept="application/json,.json" required class="mt-1 block w-full text-sm">
                 <x-field-error name="file" />
             </div>
+            <p class="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">A mapping in the file replaces that mapping's column list, so list every column you want to keep. Columns left out stop syncing; their database columns and data stay.</p>
             <p class="text-xs text-slate-500">Target tables are created or extended as each mapping is saved. See <code>config/sheet-sync.example.json</code> for the format.</p>
             <x-button class="w-full">Import</x-button>
         </form>
