@@ -307,6 +307,15 @@ composer test     # Pest, in-memory SQLite, Google is faked
 composer lint     # Laravel Pint
 ```
 
+To run the same tests on MySQL, use an **empty, separate** database. Each test rebuilds it from the migrations, which drops every table in it:
+
+```bash
+mysql -uroot -e "CREATE DATABASE sheet_sync_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+DB_CONNECTION=mysql DB_DATABASE=sheet_sync_test DB_USERNAME=root DB_PASSWORD= composer test
+```
+
+Values set on the command line override the SQLite settings in `phpunit.xml`. Never point `DB_DATABASE` at your real database.
+
 The tests cover:
 
 - reordered and extra columns
