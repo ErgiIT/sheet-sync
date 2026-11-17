@@ -235,6 +235,9 @@ redirect_stderr=true
 stdout_logfile=${APP_DIR}/storage/logs/worker.log
 CONF
 systemctl enable --now supervisor
+# systemd reports supervisor started before its control socket exists; wait until supervisorctl can connect.
+for _ in {1..30}; do supervisorctl pid >/dev/null 2>&1 && break; sleep 1; done
+supervisorctl pid >/dev/null 2>&1 || fail "supervisor did not start; check: journalctl -u supervisor"
 supervisorctl reread
 supervisorctl update
 supervisorctl restart sheet-sync-worker
