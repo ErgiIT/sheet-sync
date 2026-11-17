@@ -27,6 +27,9 @@ class SpreadsheetSyncService
             'trigger' => $trigger,
             'status' => SyncStatus::RUNNING,
             'started_at' => now(),
+            // Set explicitly so the returned model shows 0, not null, when nothing was read.
+            'rows_read' => 0,
+            'rows_written' => 0,
         ]);
 
         $lock = Cache::lock("sheet-sync:{$spreadsheet->id}", (int) config('sheets.lock_seconds'));

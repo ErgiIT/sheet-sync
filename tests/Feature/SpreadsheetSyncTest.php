@@ -218,6 +218,8 @@ it('fails the run when the sheet cannot be read and keeps existing data', functi
     $run = syncSheet($this->spreadsheet);
 
     expect($run->status)->toBe(SyncStatus::FAILED)
+        ->and($run->rows_read)->toBe(0)
+        ->and($run->rows_written)->toBe(0)
         ->and(DB::table('sales')->count())->toBe(1);
 });
 
