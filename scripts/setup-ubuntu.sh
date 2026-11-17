@@ -79,7 +79,8 @@ export DEBIAN_FRONTEND=noninteractive
 cd "$APP_DIR"
 
 # .env helpers. Values are written double-quoted; check_secret keeps out the characters dotenv would interpret.
-env_get() { grep -E "^$1=" .env 2>/dev/null | tail -n1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/'; }
+# env_get prints nothing for a missing key: with pipefail, grep's no-match status would otherwise end the script.
+env_get() { { grep -E "^$1=" .env 2>/dev/null || true; } | tail -n1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/'; }
 env_set() {
     KEY="$1" VALUE="$2" awk '
         BEGIN { line = ENVIRON["KEY"] "=\"" ENVIRON["VALUE"] "\"" }
