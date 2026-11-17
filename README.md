@@ -323,6 +323,7 @@ The tests cover:
 
 - **Columns are never dropped or retyped.** Removing a column from a mapping leaves it in the table, and so does changing its type. An automated `DROP COLUMN` on a nightly job is too easy to get wrong. Change existing columns with a migration or by hand.
 - **Removing** a spreadsheet, tab or mapping keeps the table and the data already synced.
+- **Renaming a tab** in the UI moves its synced rows to the new name (`source_tab`), so replace mode keeps clearing them. Rename the tab in Google Sheets first, then here, or the next sync can't find it.
 - **Upsert** skips rows whose key is empty. MySQL treats `NULL`s as distinct in a unique index, so those rows would be duplicated on every run.
 - A table may have several upsert mappings with **different key sets**. Each key set gets its own unique index, and every one of them must hold for every row.
 - Sheets are read in full, one request per tab. This is fine up to tens of thousands of rows per tab. Larger sheets would need to be read in ranges.

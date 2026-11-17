@@ -223,6 +223,19 @@ it('fails the run when the sheet cannot be read and keeps existing data', functi
         ->and(DB::table('sales')->count())->toBe(1);
 });
 
+it('moves synced rows to the new name when a tab is renamed, so replace mode leaves no orphans', function (): void {
+    salesMapping($this->tab);
+    $rows = [['date', 'product_name', 'price', 'amount'], ['2026-03-05', 'Apple', 1, 1]];
+    $this->sheets->put($this->spreadsheet->google_spreadsheet_id, 'Sales', $rows);
+    syncSheet($this->spreadsheet);
+
+    $this->tab->update(['name' => 'Sales 2026']);
+    $this->sheets->put($this->spreadsheet->google_spreadsheet_id, 'Sales 2026', $rows);
+    syncSheet($this->spreadsheet);
+
+    expect(DB::table('sales')->pluck('source_tab')->all())->toBe(['Sales 2026']);
+});
+
 it('marks the run partial when only some mappings fail', function (): void {
     salesMapping($this->tab);
     $broken = salesMapping($this->tab, ['target_table' => 'broken', 'columns' => [
