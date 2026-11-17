@@ -53,14 +53,15 @@
             <p x-cloak x-show="headerError" x-text="headerError" class="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700"></p>
             <x-field-error name="columns" />
 
-            <div class="grid grid-cols-[1fr_1fr_12rem_2rem] gap-2 text-xs font-medium tracking-wide text-slate-500 uppercase">
+            {{-- Phones: header and column on one line, type and remove on the next. --}}
+            <div class="grid grid-cols-2 gap-2 text-xs font-medium tracking-wide text-slate-500 uppercase sm:grid-cols-[1fr_1fr_12rem_2rem]">
                 <div>Sheet header</div>
                 <div>Table column</div>
-                <div>Type</div>
-                <div></div>
+                <div class="hidden sm:block">Type</div>
+                <div class="hidden sm:block"></div>
             </div>
             <template x-for="(column, index) in columns" :key="index">
-                <div class="grid grid-cols-[1fr_1fr_12rem_2rem] items-start gap-2">
+                <div class="grid grid-cols-2 items-start gap-2 border-b border-slate-100 pb-3 sm:grid-cols-[1fr_1fr_12rem_2rem] sm:border-0 sm:pb-0">
                     <input :name="`columns[${index}][source_column]`" x-model="column.source_column" required class="input" placeholder="Product Name">
                     <input :name="`columns[${index}][target_column]`" x-model="column.target_column" required class="input font-mono" placeholder="name">
                     <select :name="`columns[${index}][type]`" x-model="column.type" class="input">
@@ -68,7 +69,7 @@
                             <option :value="type.value" x-text="type.label" :selected="type.value === column.type"></option>
                         </template>
                     </select>
-                    <button type="button" class="mt-2 text-lg leading-none text-slate-400 hover:text-red-600" @click="removeColumn(index)" x-show="columns.length > 1" title="Remove">×</button>
+                    <button type="button" class="mt-2 justify-self-end text-lg leading-none text-slate-400 hover:text-red-600 sm:justify-self-auto" @click="removeColumn(index)" x-show="columns.length > 1" title="Remove">×</button>
                 </div>
             </template>
             @foreach ($errors->getMessages() as $key => $messages)

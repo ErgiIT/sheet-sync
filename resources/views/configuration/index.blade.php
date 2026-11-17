@@ -3,7 +3,7 @@
     <p class="mb-6 text-sm text-slate-500">The same configuration the UI edits, as a file. Import adds and updates; it never deletes spreadsheets, tabs or mappings.</p>
 
     <div class="grid gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
+        <div class="min-w-0 lg:col-span-2">
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="font-semibold">Current configuration</h2>
                 <x-button variant="secondary" :href="route('configuration.export')">Download JSON</x-button>
