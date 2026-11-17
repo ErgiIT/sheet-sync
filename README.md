@@ -113,7 +113,7 @@ To get the Google credentials, follow **[docs/google-api.md](docs/google-api.md)
 | `GOOGLE_API_KEY` | — | Alternative for public sheets only. |
 | `SHEETS_SYNC_TIME` | `02:00` | Daily sync time, in `APP_TIMEZONE`. |
 | `APP_TIMEZONE` | `UTC` | |
-| `SHEETS_DATE_FORMATS` | `Y-m-d,d/m/Y,d.m.Y,m/d/Y,d-m-Y` | Tried in order for dates stored as text in the sheet. Put `m/d/Y` before `d/m/Y` for US sheets. |
+| `SHEETS_DATE_FORMATS` | `Y-m-d,d/m/Y,d.m.Y,m/d/Y,d-m-Y` | Tried in order for dates typed as plain text in the sheet (real date cells are read as serial numbers and need no format). Put `m/d/Y` before `d/m/Y` if your text dates are US-style. |
 | `SHEETS_DATETIME_FORMATS` | `Y-m-d H:i:s,…` | Same, for date-time columns. |
 | `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | UI login created by `db:seed`. |
 | `DB_QUEUE_RETRY_AFTER` | `1900` | Must stay above the job timeout (1800 s). |
@@ -326,5 +326,5 @@ The tests cover:
 - **Upsert** skips rows whose key is empty. MySQL treats `NULL`s as distinct in a unique index, so those rows would be duplicated on every run.
 - A table may have several upsert mappings with **different key sets**. Each key set gets its own unique index, and every one of them must hold for every row.
 - Sheets are read in full, one request per tab. This is fine up to tens of thousands of rows per tab. Larger sheets would need to be read in ranges.
-- Numbers are read unformatted, so thousand separators and currency formats in the sheet don't matter. Date cells are read as the text the sheet shows, so a date column mapped to `string` keeps the readable date, not a serial number. The sheet's date format must therefore be one of `SHEETS_DATE_FORMATS`. Ambiguous formats are resolved by order (`d/m/Y` before `m/d/Y` by default).
+- Numbers are read unformatted, so thousand separators and currency formats in the sheet don't matter. Date cells are read as serial numbers, so they are stored correctly whatever the sheet's locale (`3/4/2026` in a US sheet is 4 March). Map date cells as `date` or `datetime`: mapped to `string`, they store the serial number (e.g. `46085`). Only dates typed as plain text go through `SHEETS_DATE_FORMATS`, and ambiguous ones are resolved by order (`d/m/Y` before `m/d/Y` by default).
 - There is a single admin login. User management was out of scope.

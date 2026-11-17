@@ -19,6 +19,8 @@ dataset('casts', [
     'date iso' => [ColumnType::DATE, '2026-03-05', '2026-03-05'],
     'date european' => [ColumnType::DATE, '5/3/2026', '2026-03-05'],
     'date sheets serial' => [ColumnType::DATE, 46086, '2026-03-05'],
+    'date serial of us 3/4/2026' => [ColumnType::DATE, 46085, '2026-03-04'],
+    'datetime sheets serial' => [ColumnType::DATETIME, 46086.6041666667, '2026-03-05 14:30:00'],
     'datetime' => [ColumnType::DATETIME, '2026-03-05 14:30', '2026-03-05 14:30:00'],
 ]);
 

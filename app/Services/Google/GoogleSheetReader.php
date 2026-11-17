@@ -30,11 +30,12 @@ class GoogleSheetReader implements SheetReader
     public function rows(string $spreadsheetId, string $tab): array
     {
         try {
-            // Numbers come back raw (no currency or thousands formatting) while dates keep the
-            // sheet's display format; ValueCaster relies on exactly this combination.
+            // Numbers come back raw (no currency or thousands formatting) and date cells as serial
+            // numbers, so dates don't depend on the sheet's locale: a US sheet showing 3/4/2026 means
+            // 4 March, which no text format list can tell apart from 3 April.
             $response = $this->service()->spreadsheets_values->get($spreadsheetId, $this->quoteTab($tab), [
                 'valueRenderOption' => 'UNFORMATTED_VALUE',
-                'dateTimeRenderOption' => 'FORMATTED_STRING',
+                'dateTimeRenderOption' => 'SERIAL_NUMBER',
                 'majorDimension' => 'ROWS',
             ]);
         } catch (GoogleServiceException $e) {
