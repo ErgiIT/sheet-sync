@@ -103,6 +103,14 @@ composer dev                 # web server, queue worker, logs and Vite together
 
 Open <http://localhost:8000> and log in.
 
+`composer dev` serves the CSS and JS through Vite. To run without it, build the assets once and start the server and a queue worker yourself:
+
+```bash
+npm run build
+php artisan serve
+php artisan queue:work --tries=1 --timeout=1800   # in a second terminal; needed for "Sync now"
+```
+
 To get the Google credentials, follow **[docs/google-api.md](docs/google-api.md)**. You create a project, enable the Sheets API, create a service account and download its JSON key. Then you share each sheet with the service account's email.
 
 ### Environment variables
