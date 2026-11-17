@@ -180,6 +180,12 @@ chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache
 chmod -R ug+rwX storage bootstrap/cache
 chown root:"$WEB_USER" .env
 chmod 640 .env
+# The recursive chown above hands storage to the web user; the Google key goes back to read-only for it.
+if [[ -f storage/app/private/google/service-account.json ]]; then
+    chown root:"$WEB_USER" storage/app/private/google storage/app/private/google/service-account.json
+    chmod 750 storage/app/private/google
+    chmod 640 storage/app/private/google/service-account.json
+fi
 
 step "Configuring nginx"
 cat > /etc/nginx/sites-available/sheet-sync <<NGINX
