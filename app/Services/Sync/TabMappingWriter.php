@@ -6,6 +6,7 @@ namespace App\Services\Sync;
 
 use App\Enums\SourceColumn;
 use App\Enums\SyncMode;
+use App\Exceptions\InvalidMappingException;
 use App\Models\ColumnMapping;
 use App\Models\SpreadsheetTab;
 use App\Models\TabMapping;
@@ -30,15 +31,25 @@ class TabMappingWriter
         $messages = [];
         $label = "{$tab->name} → {$mapping->target_table}";
 
+        $columns = $mapping->columns;
+        $positions = $this->headers->match($headerRow, $columns->pluck('source_column')->all());
+
+        // A header row with none of the mapped headers means the wrong row (or a different sheet), not a
+        // sheet whose cells are all empty. Writing it would wipe the table in replace mode, so stop here.
+        if ([] === $positions && $columns->isNotEmpty()) {
+            throw new InvalidMappingException(sprintf(
+                'none of the mapped headers (%s) were found in row %d of the sheet. Check the header row setting. Nothing was changed.',
+                $columns->pluck('source_column')->implode(', '),
+                max(1, $tab->header_row),
+            ));
+        }
+
         // DDL commits implicitly on MySQL, so the schema is settled before the write transaction opens.
         $added = $this->tables->ensure($mapping);
 
         if ([] !== $added) {
             $messages[] = "{$label}: added column(s) " . implode(', ', $added) . '.';
         }
-
-        $columns = $mapping->columns;
-        $positions = $this->headers->match($headerRow, $columns->pluck('source_column')->all());
 
         $missing = $columns->reject(fn (ColumnMapping $column): bool => isset($positions[$column->source_column]));
 

@@ -7,6 +7,7 @@ namespace App\Services\Google;
 use App\Exceptions\SheetReadException;
 use Google\Client;
 use Google\Service\Sheets;
+use GuzzleHttp\Client as HttpClient;
 
 class GoogleClientFactory
 {
@@ -17,6 +18,15 @@ class GoogleClientFactory
         ]);
         $client->setApplicationName(config('sheets.google.application_name'));
         $client->setScopes([Sheets::SPREADSHEETS_READONLY]);
+
+        // The library's default HTTP client has no timeout, so one stalled request would keep the run
+        // "running" until the queue kills the job. Same options as the default, plus the timeouts.
+        $client->setHttpClient(new HttpClient([
+            'base_uri' => $client->getConfig('base_path'),
+            'http_errors' => false,
+            'connect_timeout' => 10,
+            'timeout' => (int) config('sheets.google.timeout'),
+        ]));
 
         $credentialsPath = $this->credentialsPath();
 

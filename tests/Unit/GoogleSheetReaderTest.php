@@ -62,3 +62,13 @@ it('turns Google errors into one readable message with a hint', function (int $c
     'not shared' => [403, 'The caller does not have permission', 'Google Sheets API error (403) for sheet-id / Salez: The caller does not have permission. Share the spreadsheet with the service account e-mail (Viewer).'],
     'wrong id, no double full stop' => [404, 'Requested entity was not found.', 'Google Sheets API error (404) for sheet-id / Salez: Requested entity was not found. Check the spreadsheet id.'],
 ]);
+
+it('gives Google requests a timeout so a stalled call cannot hang the sync', function (): void {
+    config(['sheets.google.service_account_json' => '', 'sheets.google.api_key' => 'test-key', 'sheets.google.timeout' => 45]);
+
+    $http = (new GoogleClientFactory())->make()->getHttpClient();
+
+    expect($http->getConfig('timeout'))->toBe(45)
+        ->and($http->getConfig('connect_timeout'))->toBe(10)
+        ->and((string) $http->getConfig('base_uri'))->toBe(Client::API_BASE_PATH);
+});

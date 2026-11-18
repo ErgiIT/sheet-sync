@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Enums\ColumnType;
 use App\Enums\SyncStatus;
 use App\Enums\SyncTrigger;
+use App\Jobs\SyncSpreadsheetJob;
 use App\Models\Spreadsheet;
 use App\Models\SpreadsheetTab;
 use App\Models\TabMapping;
 use App\Services\Configuration\MappingService;
 use App\Services\Sync\SpreadsheetSyncService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -196,6 +198,24 @@ it('stores empty values and reports headers that are missing from the sheet', fu
         ->and(collect($run->messages)->implode(' '))->toContain('header(s) not found in the sheet, stored as empty: price, amount');
 });
 
+it('fails the mapping and keeps existing rows when none of the mapped headers are in the header row', function (): void {
+    salesMapping($this->tab);
+    $this->sheets->put($this->spreadsheet->google_spreadsheet_id, 'Sales', [
+        ['date', 'product_name', 'price', 'amount'],
+        ['2026-03-05', 'Apple', 1.5, 10],
+        ['2026-03-06', 'Pear', 2.25, 4],
+    ]);
+    syncSheet($this->spreadsheet);
+
+    // The header row is set one row too low, so the first data row is read as the headers.
+    $this->tab->update(['header_row' => 2]);
+    $run = syncSheet($this->spreadsheet);
+
+    expect($run->status)->toBe(SyncStatus::FAILED)
+        ->and(collect($run->messages)->implode(' '))->toContain('none of the mapped headers (date, product_name, price, amount) were found in row 2')
+        ->and(DB::table('sales')->orderBy('id')->pluck('name')->all())->toBe(['Apple', 'Pear']);
+});
+
 it('reports unreadable cell values without failing the run', function (): void {
     salesMapping($this->tab);
     $this->sheets->put($this->spreadsheet->google_spreadsheet_id, 'Sales', [
@@ -263,4 +283,28 @@ it('skips upsert rows whose key is empty', function (): void {
     syncSheet($this->spreadsheet);
 
     expect(DB::table('products')->count())->toBe(1);
+});
+
+it('marks the run of a job that died as failed and frees the spreadsheet for the next sync', function (): void {
+    // What a worker killed mid-sync leaves behind: a run stuck at running and the lock still held.
+    $run = $this->spreadsheet->syncRuns()->create([
+        'trigger' => SyncTrigger::MANUAL,
+        'status' => SyncStatus::RUNNING,
+        'started_at' => now(),
+        'rows_read' => 0,
+        'rows_written' => 0,
+    ]);
+    Cache::lock("sheet-sync:{$this->spreadsheet->id}", 3600)->get();
+
+    (new SyncSpreadsheetJob($this->spreadsheet))->failed(new RuntimeException('App\\Jobs\\SyncSpreadsheetJob has timed out.'));
+
+    $run->refresh();
+    expect($run->status)->toBe(SyncStatus::FAILED)
+        ->and($run->messages)->toBe(['The sync job stopped before finishing: App\\Jobs\\SyncSpreadsheetJob has timed out.'])
+        ->and($run->finished_at)->not->toBeNull();
+
+    salesMapping($this->tab);
+    $this->sheets->put($this->spreadsheet->google_spreadsheet_id, 'Sales', [['product_name'], ['Apple']]);
+
+    expect(syncSheet($this->spreadsheet)->status)->toBe(SyncStatus::SUCCESS);
 });

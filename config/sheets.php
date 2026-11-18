@@ -8,6 +8,8 @@ return [
         'api_key' => env('GOOGLE_API_KEY'),
         'application_name' => env('APP_NAME', 'Sheet Sync'),
         'retries' => (int) env('GOOGLE_API_RETRIES', 3),
+        // Seconds per request, so a stalled connection fails the run instead of hanging it.
+        'timeout' => (int) env('GOOGLE_API_TIMEOUT', 60),
     ],
 
     // Login for the management UI, created by `php artisan db:seed`.
@@ -24,8 +26,8 @@ return [
     'lock_seconds' => 3600,
 
     /*
-     * Tried in order before falling back to Carbon::parse, so the first match wins
-     * for ambiguous values like 03/04/2026.
+     * Tried in order for dates typed as text, so the first match wins for ambiguous values like
+     * 03/04/2026. Text that matches none of them is reported as unreadable, never guessed at.
      */
     'date_formats' => array_filter(explode(',', (string) env('SHEETS_DATE_FORMATS', 'Y-m-d,d/m/Y,d.m.Y,m/d/Y,d-m-Y'))),
 

@@ -50,7 +50,7 @@ The script installs and configures:
 - a supervisor queue worker (runs "Sync now" from the UI)
 - `/etc/cron.d/sheet-sync`, which runs `schedule:run` every minute
 
-At the end the script prints the URL and the admin login. It also saves the generated passwords to `/root/sheet-sync-credentials.txt`, which only root can read. You can run the script again safely: it keeps existing passwords and the `APP_KEY`.
+At the end the script prints the URL and the admin login. It also saves the generated passwords to `/root/sheet-sync-credentials.txt`, which only root can read. You can run the script again safely: it keeps existing passwords and the `APP_KEY`, and any option you leave out keeps its current value. For example, re-running with only `--google-key` installs the key and changes nothing else.
 
 All options (also accepted as environment variables):
 
@@ -119,6 +119,7 @@ To get the Google credentials, follow **[docs/google-api.md](docs/google-api.md)
 |---|---|---|
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | `storage/app/private/google/service-account.json` | Service account key; absolute, or relative to the project root. |
 | `GOOGLE_API_KEY` | — | Alternative for public sheets only. |
+| `GOOGLE_API_TIMEOUT` | `60` | Seconds before a Google request is given up on (the run then fails instead of hanging). |
 | `SHEETS_SYNC_TIME` | `02:00` | Daily sync time, in `APP_TIMEZONE`. |
 | `APP_TIMEZONE` | `UTC` | |
 | `SHEETS_DATE_FORMATS` | `Y-m-d,d/m/Y,d.m.Y,m/d/Y,d-m-Y` | Tried in order for dates typed as plain text in the sheet (real date cells are read as serial numbers and need no format). Put `m/d/Y` before `d/m/Y` if your text dates are US-style. |
@@ -205,12 +206,14 @@ Spreadsheets are matched by Google id, tabs by name, and mappings by target tabl
 | `string` | `VARCHAR(255)` | anything; longer text is cut to 255 |
 | `text` | `TEXT` | anything (cannot be an upsert key) |
 | `integer` | `BIGINT` | `12`, `1 200`, `1,200`, `12.0` |
-| `decimal` | `DECIMAL(18,4)` | `1234.5`, `1.234,50`, `1,234.50`, `€ 12,5` (currency symbols and spaces are stripped) |
+| `decimal` | `DECIMAL(18,4)` | `1234.5`, `1.234,50`, `1,234.50`, `€ 12,5`, `12 USD`, `(1,234.50)` as a negative. A currency symbol or code next to the number is ignored. |
 | `boolean` | `TINYINT(1)` | checkboxes, `true/false`, `yes/no`, `y/n`, `1/0`, `on/off`, `x`/`✓` (true), `-` (false) |
 | `date` | `DATE` | date cells and text dates in one of `SHEETS_DATE_FORMATS`, or a date serial number |
 | `datetime` | `DATETIME` | same, with `SHEETS_DATETIME_FORMATS` |
 
 If a value can't be read as its type, it is stored as `NULL`, and the run log counts how many per column (for example `3 value(s) in "amount" could not be read as integer`). One bad cell never fails the whole sync.
+
+Values are never guessed at. `3 to 5` or `Room 101` is not a number, and `tomorrow`, `Mon` or `0000-00-00` is not a date, so all of these are counted as unreadable. The same goes for values the column can't hold: a decimal with more than 14 digits before the point, or a date outside the years 1000–9999 (`5/3/26` reads as year 26).
 
 ### Sync modes
 
@@ -283,6 +286,8 @@ A few details that matter:
 - **Schema changes run before the data transaction.** On MySQL, DDL commits any open transaction. A failed write therefore rolls back cleanly and never leaves half a snapshot.
 - **Errors are isolated.** If one tab or mapping fails, it doesn't stop the others. The run is then `partial`, and the error is in its messages.
 - **If the sheet can't be read, nothing is deleted.** The previous data stays until a sync succeeds.
+- **A wrong header row doesn't wipe the table.** If none of a mapping's source columns are in the header row (usually because **Header row** points at the wrong row), that mapping fails and its table is left as it was. If only some are missing, the sync goes ahead, stores those columns as empty and names them in the run log.
+- **A stuck sync doesn't stay stuck.** Each Google request times out after `GOOGLE_API_TIMEOUT` seconds. If the worker still kills the job, the run is marked `failed` and the spreadsheet's lock is released, so the next sync can start.
 - **No overlapping syncs.** Each spreadsheet has its own lock, and the scheduler uses `withoutOverlapping()`.
 - **Table and column names are validated** against `^[a-z][a-z0-9_]{0,63}$` before they reach any SQL. The app's own tables (`users`, `sessions`, `jobs`, the config tables …) can never be used as a target.
 
@@ -331,8 +336,8 @@ The tests cover:
 - one tab → several tables, and several files → one table
 - replace idempotency
 - adding a column to an existing table
-- missing headers and unreadable values
-- read failures that keep existing data
+- missing headers, a header row that matches nothing, and unreadable values
+- read failures that keep existing data, and a sync job that dies mid-run
 - partial runs, upsert keys, value casting (dates, decimals with different separators, booleans)
 - validation, the UI pages, JSON import/export, and the console command
 

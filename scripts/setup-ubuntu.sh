@@ -5,30 +5,34 @@
 #
 #   sudo ./scripts/setup-ubuntu.sh --domain sheets.example.com --admin-email me@example.com
 #
-# Safe to re-run: existing .env values (DB password, APP_KEY, admin password) are kept.
+# Safe to re-run: options you don't pass again keep their current values (from .env and the nginx site),
+# as do the DB password, APP_KEY and admin password. So a re-run with only --google-key changes nothing else.
 # Every option can also be passed as an environment variable of the same name (e.g. DOMAIN=...).
 
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-DOMAIN="${DOMAIN:-_}"
-APP_TIMEZONE="${APP_TIMEZONE:-UTC}"
+# Empty means "not given": filled from the existing install further down, then from the defaults set right after that.
+DOMAIN="${DOMAIN:-}"
+APP_TIMEZONE="${APP_TIMEZONE:-}"
 PHP_VERSION="${PHP_VERSION:-8.3}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
-DB_NAME="${DB_NAME:-sheet_sync}"
-DB_USER="${DB_USER:-sheet_sync}"
+DB_NAME="${DB_NAME:-}"
+DB_USER="${DB_USER:-}"
 DB_PASSWORD="${DB_PASSWORD:-}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 GOOGLE_KEY_FILE="${GOOGLE_KEY_FILE:-}"
 GOOGLE_API_KEY="${GOOGLE_API_KEY:-}"
-SYNC_TIME="${SYNC_TIME:-02:00}"
+SYNC_TIME="${SYNC_TIME:-}"
 WEB_USER="www-data"
 CREDENTIALS_FILE="/root/sheet-sync-credentials.txt"
 
 usage() {
     cat <<EOF
 Usage: sudo $0 [options]
+
+On a re-run, options left out keep their current values; the defaults below apply to a first install.
 
   --app-dir DIR            Project directory (default: the repo this script is in)
   --domain NAME            nginx server_name (default: _ = any host)
@@ -69,7 +73,6 @@ random_secret() { openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c "${1:-2
 
 [[ $EUID -eq 0 ]] || fail "Run as root: sudo $0"
 [[ -f "$APP_DIR/artisan" ]] || fail "$APP_DIR does not look like the project (no artisan file). Use --app-dir."
-[[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ && "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || fail "DB name and user may only contain letters, digits and _."
 [[ -z "$GOOGLE_KEY_FILE" || -r "$GOOGLE_KEY_FILE" ]] || fail "Cannot read $GOOGLE_KEY_FILE."
 
 . /etc/os-release
@@ -90,6 +93,28 @@ env_set() {
     ' .env > .env.tmp && cat .env.tmp > .env && rm -f .env.tmp
 }
 check_secret() { [[ "$2" != *[\"\'\\\$\`]* ]] || fail "$1 may not contain quotes, backslashes, \$ or backticks."; }
+
+# Options not given on this run keep the current install's values, so a re-run never resets them.
+# On a first install there is no .env or nginx site yet, and the defaults apply.
+# Like env_get, a missing file must print nothing rather than end the script under pipefail.
+nginx_server_name() { { sed -nE 's/^[[:space:]]*server_name[[:space:]]+([^;]+);.*/\1/p' /etc/nginx/sites-available/sheet-sync 2>/dev/null || true; } | head -n1; }
+DOMAIN="${DOMAIN:-$(nginx_server_name)}"
+APP_TIMEZONE="${APP_TIMEZONE:-$(env_get APP_TIMEZONE)}"
+SYNC_TIME="${SYNC_TIME:-$(env_get SHEETS_SYNC_TIME)}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-$(env_get ADMIN_EMAIL)}"
+DB_NAME="${DB_NAME:-$(env_get DB_DATABASE)}"
+DB_USER="${DB_USER:-$(env_get DB_USERNAME)}"
+
+DOMAIN="${DOMAIN:-_}"
+APP_TIMEZONE="${APP_TIMEZONE:-UTC}"
+SYNC_TIME="${SYNC_TIME:-02:00}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+DB_NAME="${DB_NAME:-sheet_sync}"
+DB_USER="${DB_USER:-sheet_sync}"
+
+[[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ && "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || fail "DB name and user may only contain letters, digits and _."
+# The script sets this user's password, which must never happen to MySQL's own root account.
+[[ "$DB_USER" != "root" ]] || fail "--db-user may not be root (check DB_USERNAME in .env)."
 
 check_secret "--db-password" "$DB_PASSWORD"
 check_secret "--admin-password" "$ADMIN_PASSWORD"
